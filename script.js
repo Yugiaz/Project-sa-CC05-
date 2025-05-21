@@ -17,13 +17,20 @@ function updateScroll() {
 
 function parseSpokenTime(spoken) {
   spoken = spoken.toLowerCase().trim();
-  const timeRegex = /(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/;
+
+  // Normalize common phrases
+  spoken = spoken.replace("o'clock", "").replace("zero", "0").replace("oh", "0");
+
+  // Match patterns like "3 pm", "3:15 pm", "15 30", "15:30"
+  const timeRegex = /(\d{1,2})(?::|\.| )?(\d{0,2})\s*(am|pm)?/;
   const match = spoken.match(timeRegex);
   if (!match) return null;
 
   let hours = parseInt(match[1], 10);
   let minutes = match[2] ? parseInt(match[2], 10) : 0;
   const ampm = match[3];
+
+  if (minutes >= 60) return null; // invalid minutes
 
   if (ampm === "pm" && hours < 12) hours += 12;
   if (ampm === "am" && hours === 12) hours = 0;
@@ -56,7 +63,7 @@ function startVoiceInput(inputElem) {
       if (parsedTime) {
         inputElem.value = parsedTime;
       } else {
-        alert("Could not understand time. Please try again (e.g., say '3 PM' or '15 30').");
+        alert("Could not understand the time. Please say something like '3 PM' or '15 30'.");
       }
     } else {
       inputElem.value = transcript;
@@ -150,7 +157,7 @@ function addTask() {
   const li = document.createElement("li");
 
   const span = document.createElement("span");
-  span.textContent = `${taskText}${timeText ? ` - Due: ${timeText}` : ""}`;
+  span.textContent = `${taskText} ${timeText ? ` - Due: ${timeText}` : ""}`;
 
   // Toggle completed on click
   span.onclick = () => li.classList.toggle("completed");
