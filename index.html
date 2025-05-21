@@ -3,12 +3,11 @@
 
 <head>
   <!-- Firebase core -->
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js" defer></script>
   <!-- Firebase Messaging -->
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js" defer></script>
 
-  <link rel="manifest" href="manifest.json">
+  <link rel="manifest" href="manifest.json" />
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>To-Do List with Time</title>
@@ -34,13 +33,13 @@
     <button id="deleteAllBtn" class="delete-all-btn">Delete all tasks</button>
   </div>
 
-  <script src="script.js"></script>
+  <script src="script.js" defer></script>
 
   <script>
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker
         .register("service-worker.js")
-        .then((reg) => console.log("Service worker registered."))
+        .then(() => console.log("Service worker registered."))
         .catch((err) => console.error("Service worker error:", err));
     }
   </script>
