@@ -1,28 +1,177 @@
+const taskInput = document.getElementById("taskInput");
+const timeInput = document.getElementById("timeInput");
+const addBtn = document.getElementById("addBtn");
+const taskList = document.getElementById("taskList");
+const deleteAllBtn = document.getElementById("deleteAllBtn");
+const taskMicBtn = document.getElementById("taskMicBtn");
+const timeMicBtn = document.getElementById("timeMicBtn");
+
+// Scroll bar only if tasks > 4
+function updateScroll() {
+  if (taskList.children.length > 4) {
+    taskList.style.overflowY = "auto";
+  } else {
+    taskList.style.overflowY = "visible";
+  }
+}
+
+function parseSpokenTime(spoken) {
+  spoken = spoken.toLowerCase().trim();
+  const timeRegex = /(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/;
+  const match = spoken.match(timeRegex);
+  if (!match) return null;
+
+  let hours = parseInt(match[1], 10);
+  let minutes = match[2] ? parseInt(match[2], 10) : 0;
+  const ampm = match[3];
+
+  if (ampm === "pm" && hours < 12) hours += 12;
+  if (ampm === "am" && hours === 12) hours = 0;
+
+  if (hours > 23 || minutes > 59) return null;
+
+  return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
+}
+
+function startVoiceInput(inputElem) {
+  if (!("webkitSpeechRecognition" in window || "SpeechRecognition" in window)) {
+    alert("Sorry, your browser does not support speech recognition.");
+    return;
+  }
+
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const recognition = new SpeechRecognition();
+
+  recognition.lang = "en-US";
+  recognition.interimResults = false;
+  recognition.maxAlternatives = 1;
+
+  recognition.start();
+
+  recognition.onresult = (event) => {
+    const transcript = event.results[0][0].transcript;
+
+    if (inputElem.type === "time") {
+      const parsedTime = parseSpokenTime(transcript);
+      if (parsedTime) {
+        inputElem.value = parsedTime;
+      } else {
+        alert("Could not understand time. Please try again (e.g., say '3 PM' or '15 30').");
+      }
+    } else {
+      inputElem.value = transcript;
+    }
+  };
+
+  recognition.onerror = (event) => {
+    alert("Speech recognition error: " + event.error);
+  };
+}
+
+function addDragAndRemoveListeners(item) {
+  item.setAttribute("draggable", "true");
+
+  item.addEventListener("dragstart", handleDragStart);
+  item.addEventListener("dragenter", handleDragEnter);
+  item.addEventListener("dragover", handleDragOver);
+  item.addEventListener("dragleave", handleDragLeave);
+  item.addEventListener("drop", handleDrop);
+  item.addEventListener("dragend", handleDragEnd);
+
+  const span = item.querySelector("span");
+  const removeBtn = item.querySelector("button");
+
+  if (span) {
+    span.onclick = () => item.classList.toggle("completed");
+  }
+  if (removeBtn) {
+    removeBtn.onclick = () => {
+      item.remove();
+      updateScroll();
+    };
+  }
+}
+
+let dragSrcEl = null;
+
+function handleDragStart(e) {
+  dragSrcEl = this;
+  e.dataTransfer.effectAllowed = "move";
+  e.dataTransfer.setData("text/html", this.innerHTML);
+  this.classList.add("dragging");
+}
+
+function handleDragOver(e) {
+  if (e.preventDefault) e.preventDefault(); // Allow drop
+  e.dataTransfer.dropEffect = "move";
+  return false;
+}
+
+function handleDragEnter(e) {
+  if (this !== dragSrcEl) {
+    this.classList.add("drag-over");
+  }
+}
+
+function handleDragLeave(e) {
+  this.classList.remove("drag-over");
+}
+
+function handleDrop(e) {
+  if (e.stopPropagation) e.stopPropagation(); // Stop default action
+
+  if (dragSrcEl !== this) {
+    // Swap the innerHTML of dragged and dropped elements
+    const temp = dragSrcEl.innerHTML;
+    dragSrcEl.innerHTML = this.innerHTML;
+    this.innerHTML = temp;
+
+    // Reattach listeners after swapping innerHTML
+    addDragAndRemoveListeners(dragSrcEl);
+    addDragAndRemoveListeners(this);
+  }
+
+  return false;
+}
+
+function handleDragEnd(e) {
+  this.classList.remove("dragging");
+  // Remove drag-over class from all list items
+  const items = taskList.querySelectorAll("li");
+  items.forEach(item => item.classList.remove("drag-over"));
+}
+
 function addTask() {
-  const taskInput = document.getElementById('taskInput');
-  const timeInput = document.getElementById('timeInput');
   const taskText = taskInput.value.trim();
   const timeText = timeInput.value;
 
-  if (taskText === '') return;
+  if (taskText === "") return;
 
-  const li = document.createElement('li');
+  const li = document.createElement("li");
 
-  const span = document.createElement('span');
-  span.textContent = `${taskText} ${timeText ? ` - Due: ${timeText}` : ''}`;
-  span.onclick = () => li.classList.toggle('completed');
+  const span = document.createElement("span");
+  span.textContent = `${taskText} ${timeText ? ` - Due: ${timeText}` : ""}`;
 
-  const removeBtn = document.createElement('button');
-  removeBtn.textContent = 'X';
-  removeBtn.onclick = () => li.remove();
+  // Toggle completed on click
+  span.onclick = () => li.classList.toggle("completed");
+
+  const removeBtn = document.createElement("button");
+  removeBtn.textContent = "X";
+  removeBtn.onclick = () => {
+    li.remove();
+    updateScroll();
+  };
 
   li.appendChild(span);
   li.appendChild(removeBtn);
-  document.getElementById('taskList').appendChild(li);
+  taskList.appendChild(li);
+
+  // Add drag and remove button listeners
+  addDragAndRemoveListeners(li);
 
   if (timeText) {
     const now = new Date();
-    const [hours, minutes] = timeText.split(':').map(Number);
+    const [hours, minutes] = timeText.split(":").map(Number);
     const dueTime = new Date(now);
     dueTime.setHours(hours, minutes, 0, 0);
 
@@ -42,45 +191,25 @@ function addTask() {
     }
   }
 
-  taskInput.value = '';
-  timeInput.value = '';
+  taskInput.value = "";
+  timeInput.value = "";
+  updateScroll();
 }
 
-self.addEventListener('push', event => {
-  const data = event.data.json();
-  self.registration.showNotification(data.title, {
-    body: data.body,
-    icon: 'icon-192.png'
-  });
+deleteAllBtn.onclick = () => {
+  taskList.innerHTML = "";
+  updateScroll();
+};
+
+taskMicBtn.onclick = () => startVoiceInput(taskInput);
+timeMicBtn.onclick = () => startVoiceInput(timeInput);
+
+taskInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") addTask();
 });
 
-firebase.initializeApp({
-  apiKey: "AIzaSyDPp8cUturZoa2J3Mo3gSeJa3CIu4ey6Cg",
-  authDomain: "project-in-pf1.firebaseapp.com",
-  projectId: "project-in-pf1",
-  storageBucket: "project-in-pf1.firebasestorage.app",
-  messagingSenderId: "283902391908",
-  appId: "1:283902391908:web:011385151f13f0c963d171",
-  measurementId: "G-HNG77DHEF7"
+timeInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") addTask();
 });
 
-
-const messaging = firebase.messaging();
-
-
-Notification.requestPermission().then(permission => {
-  if (permission === 'granted') {
-    messaging.getToken({ vapidKey: "BGohZTAzvsRCZWVRuh6Tjc4siW-TI64zc59KTfhQe5VyDekv0lb3p6Gmb69tB0q22K_mePWTmPeFNmmy0ZLhsaU" })
-      .then(token => {
-        console.log("📱 FCM Token:", token);
-  
-      });
-  } else {
-    console.warn("🚫 Notification permission denied");
-  }
-
-  
-});
-
-
-
+updateScroll();
