@@ -150,7 +150,7 @@ function addTask() {
   const li = document.createElement("li");
 
   const span = document.createElement("span");
-  span.textContent = `${taskText} ${timeText ? ` - Due: ${timeText}` : ""}`;
+  span.textContent = `${taskText}${timeText ? ` - Due: ${timeText}` : ""}`;
 
   // Toggle completed on click
   span.onclick = () => li.classList.toggle("completed");
