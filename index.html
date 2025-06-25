@@ -19,18 +19,20 @@
     <h1>To-Do List</h1>
     <div class="input-container">
       <div class="task-input-wrapper">
-        <input type="text" id="taskInput" placeholder="Add a new task..." />
+        <input id="taskInput" class="input-box" placeholder="Enter task" aria-label="Task input">
         <button id="taskMicBtn" title="Speak task" class="mic-btn">&#127908;</button>
       </div>
       <div class="time-input-wrapper">
-        <input type="time" id="timeInput" />
+        <input id="timeInput" class="input-box" type="time" aria-label="Time input">
         <button id="timeMicBtn" title="Speak time" class="mic-btn">&#127908;</button>
       </div>
       <button id="addBtn" onclick="addTask()">Add</button>
     </div>
 
     <ul id="taskList"></ul>
+
     <button id="deleteAllBtn" class="delete-all-btn">Delete all tasks</button>
+    <button id="downloadBtn" class="download-btn">⬇️ Download Tasks</button>
   </div>
 
   <script src="script.js" defer></script>
