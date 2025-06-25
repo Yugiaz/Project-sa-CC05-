@@ -5,74 +5,89 @@ const taskList = document.getElementById("taskList");
 const deleteAllBtn = document.getElementById("deleteAllBtn");
 const taskMicBtn = document.getElementById("taskMicBtn");
 const timeMicBtn = document.getElementById("timeMicBtn");
+const downloadBtn = document.getElementById("downloadBtn");
 
-// Scroll bar only if tasks > 4
 function updateScroll() {
-  if (taskList.children.length > 4) {
-    taskList.style.overflowY = "auto";
-  } else {
-    taskList.style.overflowY = "visible";
-  }
+  taskList.style.overflowY = taskList.children.length > 4 ? "auto" : "visible";
 }
 
 function parseSpokenTime(spoken) {
-  spoken = spoken.toLowerCase().trim();
-
-  // Normalize common phrases
-  spoken = spoken.replace("o'clock", "").replace("zero", "0").replace("oh", "0");
-
-  // Match patterns like "3 pm", "3:15 pm", "15 30", "15:30"
-  const timeRegex = /(\d{1,2})(?::|\.| )?(\d{0,2})\s*(am|pm)?/;
+  spoken = spoken.toLowerCase().trim().replace("o'clock", "").replace("oh", "0").replace("zero", "0");
+  const timeRegex = /(\d{1,2})(?::|\.| )?(\d{0,2})?\s*(a\.?m\.?|p\.?m\.?|am|pm)?/;
   const match = spoken.match(timeRegex);
   if (!match) return null;
 
-  let hours = parseInt(match[1], 10);
-  let minutes = match[2] ? parseInt(match[2], 10) : 0;
-  const ampm = match[3];
+  let hour = parseInt(match[1]);
+  let minute = match[2] ? parseInt(match[2]) : 0;
+  const meridian = match[3]?.replace(/\./g, "").toLowerCase();
 
-  if (minutes >= 60) return null; // invalid minutes
+  if (meridian === "pm" && hour < 12) hour += 12;
+  if (meridian === "am" && hour === 12) hour = 0;
+  if (hour > 23 || minute > 59) return null;
 
-  if (ampm === "pm" && hours < 12) hours += 12;
-  if (ampm === "am" && hours === 12) hours = 0;
-
-  if (hours > 23 || minutes > 59) return null;
-
-  return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
+  return `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`;
 }
 
 function startVoiceInput(inputElem) {
-  if (!("webkitSpeechRecognition" in window || "SpeechRecognition" in window)) {
-    alert("Sorry, your browser does not support speech recognition.");
-    return;
-  }
-
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  const recognition = new SpeechRecognition();
+  if (!SpeechRecognition) return alert("Speech recognition not supported.");
 
+  const recognition = new SpeechRecognition();
   recognition.lang = "en-US";
   recognition.interimResults = false;
-  recognition.maxAlternatives = 1;
-
   recognition.start();
 
   recognition.onresult = (event) => {
-    const transcript = event.results[0][0].transcript;
-
-    if (inputElem.type === "time") {
+    const transcript = event.results[0][0].transcript.toLowerCase().trim();
+    if (inputElem === timeInput) {
       const parsedTime = parseSpokenTime(transcript);
-      if (parsedTime) {
-        inputElem.value = parsedTime;
-      } else {
-        alert("Could not understand the time. Please say something like '3 PM' or '15 30'.");
-      }
+      parsedTime ? (inputElem.value = parsedTime) : alert("Try saying '3 PM' or '15 30'.");
     } else {
       inputElem.value = transcript;
     }
   };
 
-  recognition.onerror = (event) => {
-    alert("Speech recognition error: " + event.error);
-  };
+  recognition.onerror = (event) => alert("Speech error: " + event.error);
+}
+
+function addTask() {
+  const taskText = taskInput.value.trim();
+  const timeText = timeInput.value.trim();
+
+  if (!taskText) return;
+
+  const li = document.createElement("li");
+  li.innerHTML = `
+    <span>${taskText}${timeText ? " - Due: " + timeText : ""}</span>
+    <button>X</button>
+  `;
+  addDragAndRemoveListeners(li);
+  taskList.appendChild(li);
+
+  scheduleAlerts(taskText, timeText);
+
+  taskInput.value = "";
+  timeInput.value = "";
+  updateScroll();
+}
+
+function scheduleAlerts(taskText, timeText) {
+  if (!timeText) return;
+
+  const now = new Date();
+  const [hours, minutes] = timeText.split(":").map(Number);
+  const dueTime = new Date(now);
+  dueTime.setHours(hours, minutes, 0, 0);
+
+  const msUntilDue = dueTime - now;
+  const msBefore5Min = msUntilDue - 5 * 60 * 1000;
+
+  if (msBefore5Min > 0) {
+    setTimeout(() => alert(`⏰ 5 minutes left for: "${taskText}"`), msBefore5Min);
+  }
+  if (msUntilDue > 0) {
+    setTimeout(() => alert(`🔔 Time's up for: "${taskText}"`), msUntilDue);
+  }
 }
 
 function addDragAndRemoveListeners(item) {
@@ -85,138 +100,78 @@ function addDragAndRemoveListeners(item) {
   item.addEventListener("drop", handleDrop);
   item.addEventListener("dragend", handleDragEnd);
 
-  const span = item.querySelector("span");
-  const removeBtn = item.querySelector("button");
-
-  if (span) {
-    span.onclick = () => item.classList.toggle("completed");
-  }
-  if (removeBtn) {
-    removeBtn.onclick = () => {
-      item.remove();
-      updateScroll();
-    };
-  }
+  item.querySelector("span").onclick = () => item.classList.toggle("completed");
+  item.querySelector("button").onclick = () => {
+    item.remove();
+    updateScroll();
+  };
 }
 
 let dragSrcEl = null;
-
 function handleDragStart(e) {
   dragSrcEl = this;
   e.dataTransfer.effectAllowed = "move";
   e.dataTransfer.setData("text/html", this.innerHTML);
   this.classList.add("dragging");
 }
-
-function handleDragOver(e) {
-  if (e.preventDefault) e.preventDefault(); // Allow drop
-  e.dataTransfer.dropEffect = "move";
-  return false;
-}
-
 function handleDragEnter(e) {
-  if (this !== dragSrcEl) {
-    this.classList.add("drag-over");
-  }
+  if (this !== dragSrcEl) this.classList.add("drag-over");
 }
-
+function handleDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = "move";
+}
 function handleDragLeave(e) {
   this.classList.remove("drag-over");
 }
-
 function handleDrop(e) {
-  if (e.stopPropagation) e.stopPropagation(); // Stop default action
-
+  e.stopPropagation();
   if (dragSrcEl !== this) {
-    // Swap the innerHTML of dragged and dropped elements
     const temp = dragSrcEl.innerHTML;
     dragSrcEl.innerHTML = this.innerHTML;
     this.innerHTML = temp;
-
-    // Reattach listeners after swapping innerHTML
     addDragAndRemoveListeners(dragSrcEl);
     addDragAndRemoveListeners(this);
   }
-
-  return false;
 }
-
 function handleDragEnd(e) {
   this.classList.remove("dragging");
-  // Remove drag-over class from all list items
-  const items = taskList.querySelectorAll("li");
-  items.forEach(item => item.classList.remove("drag-over"));
+  taskList.querySelectorAll("li").forEach((item) => item.classList.remove("drag-over"));
 }
 
-function addTask() {
-  const taskText = taskInput.value.trim();
-  const timeText = timeInput.value;
+function downloadTasksAsCSV() {
+  const rows = [["Task", "Time", "Completed"]];
+  taskList.querySelectorAll("li").forEach((item) => {
+    const [textPart, timePart] = item.querySelector("span").textContent.split(" - Due: ");
+    rows.push([textPart.trim(), timePart || "", item.classList.contains("completed")]);
+  });
 
-  if (taskText === "") return;
+  const csvContent = rows.map(r => r.map(escapeCSV).join(",")).join("\n");
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = "tasks.csv";
+  link.click();
+}
 
-  const li = document.createElement("li");
-
-  const span = document.createElement("span");
-  span.textContent = `${taskText} ${timeText ? ` - Due: ${timeText}` : ""}`;
-
-  // Toggle completed on click
-  span.onclick = () => li.classList.toggle("completed");
-
-  const removeBtn = document.createElement("button");
-  removeBtn.textContent = "X";
-  removeBtn.onclick = () => {
-    li.remove();
-    updateScroll();
-  };
-
-  li.appendChild(span);
-  li.appendChild(removeBtn);
-  taskList.appendChild(li);
-
-  // Add drag and remove button listeners
-  addDragAndRemoveListeners(li);
-
-  if (timeText) {
-    const now = new Date();
-    const [hours, minutes] = timeText.split(":").map(Number);
-    const dueTime = new Date(now);
-    dueTime.setHours(hours, minutes, 0, 0);
-
-    const msUntilDue = dueTime - now;
-    const msBefore5Min = msUntilDue - 5 * 60 * 1000;
-
-    if (msBefore5Min > 0) {
-      setTimeout(() => {
-        alert(`⏰ 5 minutes left to finish: "${taskText}"`);
-      }, msBefore5Min);
-    }
-
-    if (msUntilDue > 0) {
-      setTimeout(() => {
-        alert(`🔔 Time's up for: "${taskText}"`);
-      }, msUntilDue);
-    }
+function escapeCSV(val) {
+  if (typeof val !== "string") return val;
+  if (val.includes(",") || val.includes('"')) {
+    return `"${val.replace(/"/g, '""')}"`;
   }
-
-  taskInput.value = "";
-  timeInput.value = "";
-  updateScroll();
+  return val;
 }
 
+// Event bindings
+addBtn.onclick = addTask;
 deleteAllBtn.onclick = () => {
   taskList.innerHTML = "";
   updateScroll();
 };
-
+downloadBtn.onclick = downloadTasksAsCSV;
 taskMicBtn.onclick = () => startVoiceInput(taskInput);
 timeMicBtn.onclick = () => startVoiceInput(timeInput);
-
-taskInput.addEventListener("keydown", (e) => {
+[taskInput, timeInput].forEach((input) => input.addEventListener("keydown", (e) => {
   if (e.key === "Enter") addTask();
-});
-
-timeInput.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") addTask();
-});
-
+}));
 updateScroll();
